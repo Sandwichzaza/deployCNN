@@ -16,14 +16,19 @@ def load_model():
     model = models.mobilenet_v3_large(weights=None)
     # ปรับ Layer สุดท้ายให้ส่งออก 4 คลาส (glioma, meningioma, notumor, pituitary)
     model.classifier[3] = torch.nn.Linear(model.classifier[3].in_features, 4)
-    
     # โหลด Weights จากไฟล์ที่คุณอัปโหลดมา (ใช้ CPU สำหรับเว็บฟรี)
-    checkpoint = torch.load('mobilenetv3_checkpoint_fold2.pt', map_location=torch.device('cpu'), weights_only=False)
+    state_dict = torch.load('mobilenetv3_pure_pytorch.pt', map_location=torch.device('cpu'), weights_only=True)
     
-    if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
-    else:
-        model.load_state_dict(checkpoint)
+    # โค้ดเดิมที่เคยเซฟจาก PyTorch Lightning จะมี 'model_state_dict' 
+    # แต่เราแยกมันออกมาเป็น pure state_dict ล้วนๆ แล้ว
+    # เนื่องจากคีย์ใน state_dict บางตัวอาจจะมีคำนำหน้าเป็น "model." ขัดกับ torchvision models
+    # ดังนั้นเราสร้าง state_dict แบบใหม่เพื่อให้มันแกะชื่อ layer ตรงกันได้
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        name = k[6:] if k.startswith('model.') else k # remove `model.` prefix if it exists
+        new_state_dict[name] = v
+        
+    model.load_state_dict(new_state_dict)
         
     model.eval()
     return model
