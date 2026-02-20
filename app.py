@@ -1,6 +1,6 @@
 import streamlit as st
 import torch
-import torchvision.models as models
+import timm
 from torchvision import transforms
 from PIL import Image
 
@@ -9,27 +9,22 @@ st.set_page_config(page_title="Brain Tumor Classification", page_icon="🧠")
 st.title("🧠 Brain Tumor Classification Web App")
 st.write("อัปโหลดภาพ MRI สมอง เพื่อวิเคราะห์และจำแนกประเภทเนื้องอก 4 คลาส ด้วยโมเดล MobileNetV3")
 
-# 2. ฟังก์ชันโหลดโมเดล MobileNetV3
+# 2. ฟังก์ชันโหลดโมเดล MobileNetV3 (ใช้ timm ซึ่งตรงกับโครงสร้างที่ใช้ตอนเทรน)
 @st.cache_resource
 def load_model():
-    # โครงสร้างโมเดล MobileNetV3 Large
-    model = models.mobilenet_v3_large(weights=None)
-    # ปรับ Layer สุดท้ายให้ส่งออก 4 คลาส (glioma, meningioma, notumor, pituitary)
-    model.classifier[3] = torch.nn.Linear(model.classifier[3].in_features, 4)
-    # โหลด Weights จากไฟล์ที่คุณอัปโหลดมา (ใช้ CPU สำหรับเว็บฟรี)
+    # สร้างโมเดล MobileNetV3 Large จาก timm (ตรงกับโครงสร้างที่ใช้ตอนเทรนใน PyTorch Lightning)
+    model = timm.create_model('mobilenetv3_large_100', pretrained=False, num_classes=4)
+    
+    # โหลด Weights จากไฟล์ Pure PyTorch state_dict (ใช้ CPU สำหรับเว็บฟรี)
     state_dict = torch.load('mobilenetv3_pure_pytorch.pt', map_location=torch.device('cpu'), weights_only=True)
     
-    # โค้ดเดิมที่เคยเซฟจาก PyTorch Lightning จะมี 'model_state_dict' 
-    # แต่เราแยกมันออกมาเป็น pure state_dict ล้วนๆ แล้ว
-    # เนื่องจากคีย์ใน state_dict บางตัวอาจจะมีคำนำหน้าเป็น "model." ขัดกับ torchvision models
-    # ดังนั้นเราสร้าง state_dict แบบใหม่เพื่อให้มันแกะชื่อ layer ตรงกันได้
+    # ตัดคำนำหน้า "model." ออก (ถ้ามี) เพราะ Lightning จะเซฟด้วย prefix "model."
     new_state_dict = {}
     for k, v in state_dict.items():
-        name = k[6:] if k.startswith('model.') else k # remove `model.` prefix if it exists
+        name = k[6:] if k.startswith('model.') else k
         new_state_dict[name] = v
         
     model.load_state_dict(new_state_dict)
-        
     model.eval()
     return model
 
@@ -38,7 +33,7 @@ model = load_model()
 # 3. กำหนดชื่อคลาส
 class_names = ['glioma', 'meningioma', 'notumor', 'pituitary']
 
-# 4. ขั้นตอนการแปลงภาพ (Transform)
+# 4. ขั้นตอนการแปลงภาพ (Transform) - ใช้ค่า default ของ timm สำหรับ MobileNetV3
 transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
