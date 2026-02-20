@@ -18,7 +18,7 @@ def load_model():
     model.classifier[3] = torch.nn.Linear(model.classifier[3].in_features, 4)
     
     # โหลด Weights จากไฟล์ที่คุณอัปโหลดมา (ใช้ CPU สำหรับเว็บฟรี)
-    checkpoint = torch.load('mobilenetv3_checkpoint_fold2.pt', map_location=torch.device('cpu'))
+    checkpoint = torch.load('mobilenetv3_checkpoint_fold2.pt', map_location=torch.device('cpu'), weights_only=False)
     
     if 'model_state_dict' in checkpoint:
         model.load_state_dict(checkpoint['model_state_dict'])
